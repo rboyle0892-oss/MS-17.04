@@ -1,0 +1,141 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_microsoftforms": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "vmo_sharedmicrosoftforms_0c3d2"
+        },
+        "api": {
+          "name": "shared_microsoftforms"
+        }
+      },
+      "shared_office365": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "vmo_sharedoffice365_e57a9"
+        },
+        "api": {
+          "name": "shared_office365"
+        }
+      },
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "vmo_sharedsharepointonline_caa20"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "When_a_new_response_is_submitted": {
+          "splitOn": "@triggerOutputs()?['body/value']",
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "parameters": {
+              "form_id": "zKu2C8uk4k-bUtOra66QFGzOBdsJgTtLpIQfqu-kitxUOEdYTUw5VFRUUlhXMFFOSlZCMkE0WFJNMy4u"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms",
+              "operationId": "CreateFormWebhook"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Send_an_email_(V2)": {
+          "runAfter": {
+            "Create_item": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "emailMessage/To": "ITVMO@ashurst.com",
+              "emailMessage/Subject": "New VMO Spend Request:  - @{outputs('Create_item')?['body/ID']}",
+              "emailMessage/Body": "<p class=\"editor-paragraph\">New VMO Spend Request Submitted: @{outputs('Create_item')?['body/ID']}</p><br><p class=\"editor-paragraph\">Request Number @{outputs('Create_item')?['body/ID']}</p><br>",
+              "emailMessage/From": "itvmo@ashurst.com",
+              "emailMessage/Cc": "@outputs('Get_response_details')?['body/responder']",
+              "emailMessage/Importance": "Normal"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Get_response_details": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "form_id": "zKu2C8uk4k-bUtOra66QFGzOBdsJgTtLpIQfqu-kitxUOEdYTUw5VFRUUlhXMFFOSlZCMkE0WFJNMy4u",
+              "response_id": "@triggerOutputs()?['body/resourceData/responseId']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms",
+              "operationId": "GetFormResponseById"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Create_item": {
+          "runAfter": {
+            "Get_response_details": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+              "table": "fdd5abb7-ec10-4913-9f76-fd6cbc2d36fa",
+              "item/Please_x0020_provide_x0020_a_x00": "@outputs('Get_response_details')?['body/rbc748f147dfb4f6187d09a3dd6ec458e']",
+              "item/Please_x0020_provide_x0020_a_x000": "@outputs('Get_response_details')?['body/r9df75a550e9144f98160aca61dfd16ee']",
+              "item/Please_x0020_provide_x0020_an_x0": "@outputs('Get_response_details')?['body/r112c372c5eb5465aae9e8ab91b0ee758']",
+              "item/Please_x0020_provide_x0020_the_x": "@outputs('Get_response_details')?['body/rc1ddfceb12ec4b43b8ce81393e6b8212']",
+              "item/Title": "@outputs('Get_response_details')?['body/rfbd595cb6c534a99a82449087906728d']",
+              "item/RequestNumber": "@triggerOutputs()?['body/resourceData/responseId']",
+              "item/Is_x0020_this_x0020_Spend_x0020_/Value": "@outputs('Get_response_details')?['body/r90afcd2d713845199e7af86a5088e37c']",
+              "item/Is_x0020_this_x0020_Software_x00/Value": "@outputs('Get_response_details')?['body/r76aff111bc604fbb99c8afa63099c47d']",
+              "item/Do_x0020_you_x0020_have_x0020_a_/Value": "@outputs('Get_response_details')?['body/r0f2e190d382c4e7aa20849bd5178d087']",
+              "item/Is_x0020_this_x0020_Spend_x0020_0/Value": "@outputs('Get_response_details')?['body/ra05b741bacf743d2ab2456f046094d4f']",
+              "item/What_x0020_is_x0020_the_x0020_Bu": "@outputs('Get_response_details')?['body/r658c85db972b4b35a2c88a2138eb9775']",
+              "item/SubmittedBy/Claims": "@outputs('Get_response_details')?['body/responder']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "PostItem"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

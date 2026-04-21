@@ -1,0 +1,234 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "vmo_sharedsharepointonline_caa20"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "SharePointSite_VMOBudget": {
+          "defaultValue": "",
+          "type": "String"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "recurrence": {
+            "frequency": "Day",
+            "interval": 1,
+            "startTime": "2026-03-06T10:00:00Z"
+          },
+          "metadata": {
+            "operationMetadataId": "773cf042-fb8e-45d5-8a60-ddf79db9c760"
+          },
+          "type": "Recurrence"
+        }
+      },
+      "actions": {
+        "Get_items": {
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "3a2a6135-6463-4c4f-ad2b-2f1f91c06998"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+              "table": "a7d5157e-523c-40a5-9b16-7c3118a86fb9",
+              "$filter": "Status eq 'Active' and VMO_IsActive eq 1 and EndDate le '@{addDays(utcNow(),100)}'"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "operationId": "GetItems",
+              "connectionName": "shared_sharepointonline"
+            }
+          }
+        },
+        "Apply_to_each": {
+          "foreach": "@outputs('Get_items')?['body/value']",
+          "actions": {
+            "Get_items_2": {
+              "metadata": {
+                "operationMetadataId": "40ed6e68-29fc-4121-815e-91d881bbc6bc"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                  "table": "c86e140f-05c9-45b4-b3db-cf9415653b69",
+                  "$filter": " BudgetCode eq '@{items('Apply_to_each')?['BudgetCode']}' and RequestStatus ne 'Closed'"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "operationId": "GetItems",
+                  "connectionName": "shared_sharepointonline"
+                }
+              }
+            },
+            "Condition": {
+              "actions": {
+                "Create_item_2": {
+                  "runAfter": {
+                    "Update_item": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "50e8e607-d251-4f02-ad5f-f244dc1aee59"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "9483b2ad-077a-4d30-bec1-fefd7a9b212e",
+                      "item/Title": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/Message": "<p>Readiness Request Created</p>",
+                      "item/EntityType/Value": "BudgetLine",
+                      "item/EntityId": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/EventType/Value": "Create",
+                      "item/Timestamp": "@utcnow()"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PostItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                },
+                "Create_item": {
+                  "metadata": {
+                    "operationMetadataId": "f2314659-0c06-4802-b457-e6603eb65b7d"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "VMO_ReadinessRequests",
+                      "item/Title": "Reeadiness Request: @{items('Apply_to_each')?['BudgetCode']}",
+                      "item/BudgetCode": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/AssigneeEmail": "@items('Apply_to_each')?['SMEEmail']",
+                      "item/OwnerEmail": "@items('Apply_to_each')?['PillarEmail']",
+                      "item/RequestStatus/Value": "Open",
+                      "item/DueDate": "@addDays(items('Apply_to_each')?['EndDate'], -100)",
+                      "item/VMO_RequestId": "@concat('RR-', guid())",
+                      "item/Procurement/Value": "@items('Apply_to_each')?['Procurement']",
+                      "item/SAM/Value": "@items('Apply_to_each')?['SAM']",
+                      "item/Vendor": "@items('Apply_to_each')?['Vendor']",
+                      "item/Product": "@items('Apply_to_each')?['Product']"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PostItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                },
+                "Update_item": {
+                  "runAfter": {
+                    "Update_item_2": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "f7b3fc29-9f4f-41e4-ad0f-0bbd0d990ae2"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "a7d5157e-523c-40a5-9b16-7c3118a86fb9",
+                      "id": "@items('Apply_to_each')?['ID']",
+                      "item/Title": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/VMO_IsActive": true,
+                      "item/VMO_ReadinessOpenCount": 1,
+                      "item/VMO_LastReadinessSent": "@utcnow()",
+                      "item/VMO_LastStatusChange": "@utcnow()"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PatchItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                },
+                "Update_item_2": {
+                  "runAfter": {
+                    "Create_item": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "a0fce8d6-66ff-46e3-93ef-393430adc135"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "c86e140f-05c9-45b4-b3db-cf9415653b69",
+                      "id": "@outputs('Create_item')?['body/ID']",
+                      "item/Title": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/RequestStatus/Value": "Open",
+                      "item/Deeplink": "@concat(\n  'https://apps.powerapps.com/play/e/Default-0bb6abcc-a4cb-4fe2-9b52-d3ab6bae9014/a/b1c445c9-c36a-475c-b956-1a226e5131f2?requestId=',\n  outputs('Create_item')?['body/VMO_RequestId']\n)",
+                      "item/IsThisStillRequired_x003f_": true
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PatchItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Get_items_2": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {}
+              },
+              "expression": {
+                "equals": [
+                  "@length(body('Get_items_2')?['value'])",
+                  0
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "f665ce24-f897-49f6-b4f0-26a85aa987bc"
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "Get_items": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "7c96f40c-4a82-4235-952c-1aa688397faa"
+          },
+          "type": "Foreach"
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

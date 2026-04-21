@@ -1,0 +1,182 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "vmo_sharedsharepointonline_caa20"
+        },
+        "api": {
+          "name": "shared_sharepointonline"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "SharePointSite_VMOBudget": {
+          "defaultValue": "",
+          "type": "String"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "recurrence": {
+            "frequency": "Day",
+            "interval": 1,
+            "startTime": "2026-03-06T10:00:00Z"
+          },
+          "metadata": {
+            "operationMetadataId": "af03831f-e328-4c6e-8628-76478348be5f"
+          },
+          "type": "Recurrence"
+        }
+      },
+      "actions": {
+        "Get_items": {
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "e9a6d107-4e17-44f6-954c-b7b1845e0547"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+              "table": "c86e140f-05c9-45b4-b3db-cf9415653b69",
+              "$filter": "RequestStatus ne 'Submitted' and DueDate le '@{utcNow()}'"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "operationId": "GetItems",
+              "connectionName": "shared_sharepointonline"
+            }
+          }
+        },
+        "Apply_to_each": {
+          "foreach": "@outputs('Get_items')?['body/value']",
+          "actions": {
+            "Condition": {
+              "actions": {
+                "Update_item": {
+                  "metadata": {
+                    "operationMetadataId": "e027a7b9-2d65-4c31-b9a7-c26ef09fba38"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "c86e140f-05c9-45b4-b3db-cf9415653b69",
+                      "id": "@items('Apply_to_each')?['ID']",
+                      "item/Title": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/RequestStatus/Value": "Overdue"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PatchItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                },
+                "Create_item": {
+                  "runAfter": {
+                    "Update_item": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "3ce8e210-9b0f-4c29-b921-4ebf24f12082"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "9483b2ad-077a-4d30-bec1-fefd7a9b212e",
+                      "item/Title": "@outputs('Update_item')?['body/BudgetCode']",
+                      "item/Message": "<p>Request Overdue</p>",
+                      "item/EntityType/Value": "ReadinessRequest",
+                      "item/EntityId": "@outputs('Update_item')?['body/VMO_RequestId']",
+                      "item/EventType/Value": "Update"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PostItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                },
+                "Create_item_2": {
+                  "runAfter": {
+                    "Create_item": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "98f6a9d2-6276-4709-957b-dff42b407412"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://ashurst.sharepoint.com/sites/ITBudgetWorkingGroup",
+                      "table": "0cbc9762-40ae-46e6-8b3f-15ce7cee6edc",
+                      "item/Title": "@items('Apply_to_each')?['BudgetCode']",
+                      "item/TargetEmail": "@items('Apply_to_each')?['AssigneeEmail']",
+                      "item/Subject": "Readiness Request Overdue ",
+                      "item/Body": "<p class=\"editor-paragraph\">Please complete readiness for budget @{items('Apply_to_each')?['BudgetCode']}</p><br><p class=\"editor-paragraph\"><a href=\"@{items('Apply_to_each')?['Link']}\" class=\"editor-link\">Open readiness request</a></p>",
+                      "item/Link": "@items('Apply_to_each')?['Deeplink']",
+                      "item/Status/Value": "Pending",
+                      "item/LastAttempt": "@utcNow()"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "operationId": "PostItem",
+                      "connectionName": "shared_sharepointonline"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "expression": {
+                "and": [
+                  {
+                    "not": {
+                      "equals": [
+                        "@items('Apply_to_each')?['RequestStatus']?['Value']",
+                        "Submitted"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "04a5e9e8-555e-42ae-8aab-50357302c96b"
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "Get_items": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "f7f8c2cb-aa24-4986-bb9c-bb0101a15188"
+          },
+          "type": "Foreach"
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
